@@ -72,7 +72,8 @@
 #define TAS2563_BLOCK_CFG_POST			0x05
 #define TAS2563_BLOCK_CFG_POST_POWER	0x06
 
-static char pICN[] = {0x00, 0x03, 0x46, 0xdc};
+static char pICN[] = {0x00, 0x01, 0x09, 0x45};
+static char pICNDelay[] = {0x00, 0x01, 0x00, 0x00};
 static char const *iv_enable_text[] = {"Off", "On"};
 static int tas2563iv_enable;
 static const struct soc_enum tas2563_enum[] = {
@@ -940,41 +941,6 @@ static int fw_parse_data(struct tas2563_priv *pTAS2563, struct TFirmware *pFirmw
 	return pData - pDataStart;
 }
 
-#if 0
-static int fw_parse_pll_data(struct tas2563_priv *pTAS2563,
-	struct TFirmware *pFirmware, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned int nPLL;
-	struct TPLL *pPLL;
-
-	pFirmware->mnPLLs = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	if (pFirmware->mnPLLs == 0)
-		goto end;
-
-	pFirmware->mpPLLs = kmalloc_array(pFirmware->mnPLLs, sizeof(struct TPLL), GFP_KERNEL);
-	for (nPLL = 0; nPLL < pFirmware->mnPLLs; nPLL++) {
-		pPLL = &(pFirmware->mpPLLs[nPLL]);
-
-		memcpy(pPLL->mpName, pData, 64);
-		pData += 64;
-
-		n = strlen(pData);
-		pPLL->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-		pData += n + 1;
-
-		n = fw_parse_block_data(pTAS2563, pFirmware, &(pPLL->mBlock), pData);
-		pData += n;
-	}
-
-end:
-	return pData - pDataStart;
-}
-#endif
-
 static int fw_parse_program_data(struct tas2563_priv *pTAS2563,
 	struct TFirmware *pFirmware, unsigned char *pData)
 {
@@ -1156,14 +1122,6 @@ static int fw_parse(struct tas2563_priv *pTAS2563,
 	nSize -= nPosition;
 	nPosition = 0;
 
-	/*removed pll section*/
-/*	nPosition = fw_parse_pll_data(pTAS2563, pFirmware, pData);
-
-	pData += nPosition;
-	nSize -= nPosition;
-	nPosition = 0;
-*/
-
 	nPosition = fw_parse_program_data(pTAS2563, pFirmware, pData);
 	dev_info(pTAS2563->dev, "program size: %d, line: %d\n", nPosition, __LINE__);
 
@@ -1288,8 +1246,13 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 		if (nResult < 0)
 			return nResult;
 		pTAS2563->mbPowerUp = true;
-		dev_info(pTAS2563->dev, "set ICN to -80dB\n");
+		dev_info(pTAS2563->dev, "set ICN to -90dB\n");
 		nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_REG, pICN, 4);
+		if(nResult < 0)
+			return nResult;
+
+		dev_info(pTAS2563->dev, "set ICN delay\n");
+		nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_DELAY, pICNDelay, 4);
 		break;
 
 	case TAS2563_POWER_MUTE:
@@ -1389,7 +1352,7 @@ static int tas2563_mute(struct snd_soc_dai *dai, int mute)
 	return 0;
 }
 
-#if 1
+
 static int tas2563_slot_config(struct snd_soc_codec *codec, struct tas2563_priv *pTAS2563, int blr_clk_ratio)
 {
 	int ret = 0;
@@ -1401,12 +1364,11 @@ static int tas2563_slot_config(struct snd_soc_codec *codec, struct tas2563_priv 
 
 	return ret;
 }
-#endif
 
 static int tas2563_set_slot(struct tas2563_priv *pTAS2563, int slot_width)
 {
 	int ret = 0;
-	dev_info(pTAS2563->dev, "%s, %d, ret = %d", __func__, __LINE__, ret);
+	dev_info(pTAS2563->dev, "%s, slot_width:%d\n", __func__, slot_width);
 
 	switch (slot_width) {
 	case 16:
@@ -1447,7 +1409,7 @@ static int tas2563_set_slot(struct tas2563_priv *pTAS2563, int slot_width)
 
 static int tas2563_set_bitwidth(struct tas2563_priv *pTAS2563, int bitwidth)
 {
-	int slot_width_tmp = 16;
+	int slot_width_tmp = 0;
 	dev_info(pTAS2563->dev, "%s %d\n", __func__, __LINE__);
 
 	switch (bitwidth) {
@@ -1575,8 +1537,13 @@ int tas2563_load_default(struct tas2563_priv *pTAS2563)
 	if (ret < 0)
 		goto end;
 	dev_info(pTAS2563->dev, "%s, %d, ret = %d", __func__, __LINE__, ret);
-	
-        //if set format was not called by asoc, then set it default
+
+	/* proper TX format */
+	ret = pTAS2563->write(pTAS2563, TAS2563_TDMConfigurationReg4, 0x01);
+	if(ret < 0)
+		goto end;
+
+	/*if setting format was not called by asoc, then set it default*/
 	if(pTAS2563->mnASIFormat == 0)
                 pTAS2563->mnASIFormat = SND_SOC_DAIFMT_CBS_CFS 
 				| SND_SOC_DAIFMT_IB_NF 
@@ -2024,7 +1991,6 @@ int tas2563_set_program(struct tas2563_priv *pTAS2563,
 		if (nResult < 0)
 			goto end;
 		if (pProgram->mnAppMode == TAS2563_APP_TUNINGMODE) {
-//			nResult = tas2563_checkPLL(pTAS2563);
 			if (nResult < 0) {
 				tas2563_set_power_state(pTAS2563, TAS2563_POWER_SHUTDOWN);
 				pTAS2563->mbPowerUp = false;

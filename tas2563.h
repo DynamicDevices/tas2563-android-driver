@@ -646,6 +646,7 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 
 	/* ICN set */
 #define TAS2563_ICN_REG TAS2563_REG(0, 2, 0x5c)	
+#define TAS2563_ICN_DELAY TAS2563_REG(0, 2, 0x64)
 
     /* Book */
 #define TAS2563_Book  TAS2563_REG(0x0, 0x0, 0x7F)
