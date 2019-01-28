@@ -2230,8 +2230,8 @@ static int tas2563_hw_params(struct snd_pcm_substream *substream,
 
 	ret = tas2563_set_samplerate(pTAS2563, params_rate(params));
 
-	mutex_unlock(&pTAS2563->codec_lock);
 ret:
+	mutex_unlock(&pTAS2563->codec_lock);
 	return ret;
 }
 
