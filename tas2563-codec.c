@@ -72,13 +72,9 @@
 #define TAS2563_BLOCK_CFG_POST			0x05
 #define TAS2563_BLOCK_CFG_POST_POWER	0x06
 
-static char pICN[] = {0x00, 0x01, 0x09, 0x45};
-static char pICNDelay[] = {0x00, 0x01, 0x00, 0x00};
-static char const *iv_enable_text[] = {"Off", "On"};
-static int tas2563iv_enable;
-static const struct soc_enum tas2563_enum[] = {
-    SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(iv_enable_text), iv_enable_text),
-};
+/*600ms, -105dB*/
+static char pICN[] = {0x00, 0x00, 0x2f, 0x2c};
+static char pICNDelay[] = {0x00, 0x00, 0x70, 0x80};
 static int tas2563_set_fmt(struct tas2563_priv *pTAS2563, unsigned int fmt);
 static void tas2563_clear_firmware(struct TFirmware *pFirmware);
 
@@ -709,64 +705,6 @@ end:
 	return nResult;
 }
 
-
-static int tas2563iv_put(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
-{
-#ifdef KCONTROL_CODEC
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-#else
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-#endif
-
-    if (codec == NULL) {
-		pr_err("%s: codec is NULL \n",  __func__);
-		return 0;
-    }
-
-    tas2563iv_enable = ucontrol->value.integer.value[0];
-
-	if (tas2563iv_enable) {
-		pr_debug("%s: tas2563iv_enable \n", __func__);
-		snd_soc_update_bits(codec, TAS2563_PowerControl,
-			TAS2563_PowerControl_OperationalMode10_Mask |
-		    TAS2563_PowerControl_ISNSPower_Mask |
-		    TAS2563_PowerControl_VSNSPower_Mask,
-		    TAS2563_PowerControl_OperationalMode10_Active |
-		    TAS2563_PowerControl_VSNSPower_Active |
-		    TAS2563_PowerControl_ISNSPower_Active);
-	} else {
-		pr_debug("%s: tas2563iv_disable \n", __func__);
-		snd_soc_update_bits(codec, TAS2563_PowerControl,
-			TAS2563_PowerControl_OperationalMode10_Mask |
-			TAS2563_PowerControl_ISNSPower_Mask |
-			TAS2563_PowerControl_VSNSPower_Mask,
-			TAS2563_PowerControl_OperationalMode10_Active |
-			TAS2563_PowerControl_VSNSPower_PoweredDown |
-			TAS2563_PowerControl_ISNSPower_PoweredDown);
-	}
-
-	pr_debug("%s: tas2563iv_enable = %d\n", __func__, tas2563iv_enable);
-
-	return 0;
-}
-
-static int tas2563iv_get(struct snd_kcontrol *kcontrol,
-				  struct snd_ctl_elem_value *ucontrol)
-{
-   int value;
-   ucontrol->value.integer.value[0] = tas2563iv_enable;
-   value=gpio_get_value(37);
-   pr_debug("%s: tas2563iv_enable = %d\n", __func__, tas2563iv_enable);
-   pr_debug("%s: gpio37 value = %d\n", __func__, value);
-   return 0;
-}
-
-static const struct snd_kcontrol_new tas2563_controls[] = {
-SOC_ENUM_EXT("TAS2563 IVSENSE ENABLE", tas2563_enum[1],
-		    tas2563iv_get, tas2563iv_put),
-};
-
 static int tas2563_codec_write(struct snd_soc_codec *codec, unsigned int reg,
 	unsigned int value)
 {
@@ -969,8 +907,6 @@ static int fw_parse_program_data(struct tas2563_priv *pTAS2563,
 		pProgram->mnAppMode = pData[0];
 		pData++;
 
-		/*pProgram->mnBoost = (pData[0] << 8) + pData[1];
-		pData += 2;*/
 		pProgram->mnI2sMode = pData[0];
 		pData++;
 		dev_info(pTAS2563->dev, "FW i2sMode: %d", pProgram->mnI2sMode);
@@ -1171,15 +1107,6 @@ static int tas2563_codec_resume(struct snd_soc_codec *codec)
 	return ret;
 }
 
-static const struct snd_kcontrol_new tas2563_asi_controls[] = {
-	SOC_DAPM_SINGLE("Left", TAS2563_TDMConfigurationReg2,
-		4, 1, 0),
-	SOC_DAPM_SINGLE("Right", TAS2563_TDMConfigurationReg2,
-		4, 2, 0),
-	SOC_DAPM_SINGLE("LeftRightDiv2", TAS2563_TDMConfigurationReg2,
-		4, 3, 0),
-};
-
 static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 {
 	int nResult = 0;
@@ -1212,7 +1139,7 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 		goto end;
 	}
 	*/
-	
+
 	pProgram = &(pTAS2563->mpFirmware->mpPrograms[pTAS2563->mnCurrentProgram]);
 	dev_info(pTAS2563->dev, "%s, state: %d, mbPowerup %d\n", __func__, state, pTAS2563->mbPowerUp);
 	if (state != TAS2563_POWER_SHUTDOWN) {
@@ -1295,25 +1222,18 @@ static int tas2563_dac_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		tas2563_set_power_state(pTAS2563, TAS2563_POWER_ACTIVE);
+		dev_info(pTAS2563->dev, "SND_SOC_DAPM_POST_PMU\n");
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
-		tas2563_set_power_state(pTAS2563, TAS2563_POWER_SHUTDOWN);
+		dev_info(pTAS2563->dev, "SND_SOC_DAPM_PRE_PMD\n");
 		break;
-
 	}
-	return 0;
 
+	return 0;
 }
 
 static const struct snd_soc_dapm_widget tas2563_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_IN("ASI1", "ASI1 Playback", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_OUT("Voltage Sense", "ASI1 Capture",  1, TAS2563_PowerControl, 2, 1),
-	SND_SOC_DAPM_AIF_OUT("Current Sense", "ASI1 Capture",  0, TAS2563_PowerControl, 3, 1),
-	SND_SOC_DAPM_MIXER("ASI1 Sel",
-		TAS2563_TDMConfigurationReg2, 4, 0,
-		&tas2563_asi_controls[0],
-		ARRAY_SIZE(tas2563_asi_controls)),
 	SND_SOC_DAPM_DAC_E("DAC", NULL, SND_SOC_NOPM, 0, 0, tas2563_dac_event,
 	SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_OUTPUT("OUT"),
@@ -1322,17 +1242,9 @@ static const struct snd_soc_dapm_widget tas2563_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route tas2563_audio_map[] = {
-	{"ASI1 Sel", "Left", "ASI1"},
-	{"ASI1 Sel", "Right", "ASI1"},
-	{"ASI1 Sel", "LeftRightDiv2", "ASI1"},
-	{"DAC", NULL, "ASI1 Sel"},
+	{"DAC", NULL, "ASI1"},
 	{"OUT", NULL, "DAC"},
-	/*{"VMON", NULL, "Voltage Sense"},
-	{"IMON", NULL, "Current Sense"},*/
-	{"Voltage Sense", NULL, "VMON"},
-	{"Current Sense", NULL, "IMON"},
 };
-
 
 static int tas2563_mute(struct snd_soc_dai *dai, int mute)
 {
@@ -1635,37 +1547,6 @@ static int tas2563_load_coefficient(struct tas2563_priv *pTAS2563,
 
 	pNewConfiguration = &(pTAS2563->mpFirmware->mpConfigurations[nNewConfig]);
 	pTAS2563->mnCurrentConfiguration = nNewConfig;
-#if 0
-	if (pPrevConfiguration) {
-		if (pPrevConfiguration->mnPLL == pNewConfiguration->mnPLL) {
-			dev_info(pTAS2563->dev, "%s, PLL same\n", __func__);
-			goto prog_coefficient;
-		}
-	}
-
-	pProgram = &(pTAS2563->mpFirmware->mpPrograms[pTAS2563->mnCurrentProgram]);
-	if (bPowerOn) {
-		dev_info(pTAS2563->dev, "%s, power down to load new PLL\n", __func__);
-		if (hrtimer_active(&pTAS2563->mtimerwork))
-			hrtimer_cancel(&pTAS2563->mtimerwork);
-
-		if (pProgram->mnAppMode == TAS2563_APP_TUNINGMODE)
-			pTAS2563->enableIRQ(pTAS2563, false);
-
-		nResult = tas2563_set_power_state(pTAS2563, TAS2563_POWER_SHUTDOWN);
-		if (nResult < 0)
-			goto end;
-		bRestorePower = true;
-	}
-
-	/* load PLL */
-	pPLL = &(pTAS2563->mpFirmware->mpPLLs[pNewConfiguration->mnPLL]);
-	dev_info(pTAS2563->dev, "load PLL: %s block for Configuration %s\n",
-		pPLL->mpName, pNewConfiguration->mpName);
-	nResult = tas2563_load_block(pTAS2563, &(pPLL->mBlock));
-	if (nResult < 0)
-		goto end;
-#endif
 	pTAS2563->mnCurrentSampleRate = pNewConfiguration->mnSamplingRate;
 
 	dev_info(pTAS2563->dev, "load configuration %s conefficient pre block\n",
@@ -1974,10 +1855,8 @@ int tas2563_set_program(struct tas2563_priv *pTAS2563,
 
 	// Enable IV data
 	nResult = pTAS2563->update_bits(pTAS2563, TAS2563_PowerControl,
-					TAS2563_PowerControl_OperationalMode10_Mask |
 				TAS2563_PowerControl_ISNSPower_Mask |
 				TAS2563_PowerControl_VSNSPower_Mask,
-				TAS2563_PowerControl_OperationalMode10_Active |
 				TAS2563_PowerControl_VSNSPower_Active |
 				TAS2563_PowerControl_ISNSPower_Active);
 	if (nResult < 0)
@@ -2454,8 +2333,8 @@ static int tas2563_codec_probe(struct snd_soc_codec *codec)
 	int ret;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
 
-	ret = snd_soc_add_codec_controls(codec, tas2563_controls,
-					 ARRAY_SIZE(tas2563_controls));
+/*	ret = snd_soc_add_codec_controls(codec, tas2563_controls,
+					 ARRAY_SIZE(tas2563_controls));*/
 	if (ret < 0) {
 		pr_err("%s: add_codec_controls failed, err %d\n",
 			__func__, ret);
