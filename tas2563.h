@@ -576,6 +576,14 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 #define TAS2563_MiscIRQ_IRQZBITBANG_IRQZInputBuf0  (0x0 << 0)
 #define TAS2563_MiscIRQ_IRQZBITBANG_IRQZInputBuf1  (0x1 << 0)
 
+    /* Boost Configuration */
+#define TAS2563_BoostConfiguration  TAS2563_REG(0x0, 0x0, 0x33)
+#define TAS2563_BoostConfiguration_BoostMode_Mask   (0x3 << 6)
+#define TAS2563_BoostConfiguration_BoostMode_ClassH (0x0 << 6)
+#define TAS2563_BoostConfiguration_BoostMode_ClassG (0x1 << 6)
+#define TAS2563_BoostConfiguration_BoostMode_AlwaysOn (0x2 << 6)
+#define TAS2563_BoostConfiguration_BoostMode_AlwaysOff (0x3 << 6)
+
     /* Clock Configuration */
 #define TAS2563_ClockConfiguration  TAS2563_REG(0x0, 0x0, 0x38)
 #define TAS2563_ClockConfiguration_SBCLKtoFS52_Mask  (0xf << 2)
@@ -663,7 +671,7 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 #define	TAS2563_APP_TUNINGMODE	2
 #define	TAS2563_APP_ROM1_96KHZ	3
 #define	TAS2563_APP_ROM2_96KHZ	4
-#define	TAS2563_APP_RAMMODE		5
+#define	TAS2563_APP_RAMMODE	5
 
 #define TAS2563_RegisterCount  55
 
@@ -679,10 +687,10 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 #define ERROR_UNDER_VOLTAGE	0x0000010
 #define ERROR_BROWNOUT		0x0000020
 #define ERROR_CLASSD_PWR	0x0000040
-#define ERROR_FAILSAFE      0x4000000
+#define ERROR_FAILSAFE      	0x4000000
 
 #define TAS2563_COEFFICIENT_TMAX	0x7fffffff
-#define TAS2563_SAFE_GUARD_PATTERN		0x5a
+#define TAS2563_SAFE_GUARD_PATTERN	0x5a
 #define LOW_TEMPERATURE_CHECK_PERIOD 5000	/* 5 second */
 
 struct tas2563_register {
@@ -814,6 +822,7 @@ struct tas2563_priv {
 	int mnCh_size;
 	int mnDieTvReadCounter;
 	int mnPCMFormat;
+	int mnVBoostState;
 	bool mbLoadConfigurationPrePowerUp;
 	bool mbLoadCalibrationPostPowerUp;
 	bool mbCalibrationLoaded;

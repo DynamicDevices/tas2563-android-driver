@@ -72,9 +72,8 @@
 #define TAS2563_BLOCK_CFG_POST			0x05
 #define TAS2563_BLOCK_CFG_POST_POWER	0x06
 
-/*600ms, -105dB*/
-static char pICN[] = {0x00, 0x00, 0x2f, 0x2c};
-static char pICNDelay[] = {0x00, 0x00, 0x70, 0x80};
+static char pICN[] = {0x00, 0x01, 0x09, 0x45};
+static char pICNDelay[] = {0x00, 0x01, 0x00, 0x00};
 static int tas2563_set_fmt(struct tas2563_priv *pTAS2563, unsigned int fmt);
 static void tas2563_clear_firmware(struct TFirmware *pFirmware);
 
@@ -2330,16 +2329,8 @@ static struct snd_soc_dai_driver tas2563_dai_driver[] = {
 
 static int tas2563_codec_probe(struct snd_soc_codec *codec)
 {
-	int ret;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
 
-/*	ret = snd_soc_add_codec_controls(codec, tas2563_controls,
-					 ARRAY_SIZE(tas2563_controls));*/
-	if (ret < 0) {
-		pr_err("%s: add_codec_controls failed, err %d\n",
-			__func__, ret);
-		return ret;
-	}
 	pTAS2563->codec = codec;
 	pTAS2563->set_calibration = tas2563_set_calibration;
 	pTAS2563->set_config = tas2563_set_config;
@@ -2357,6 +2348,62 @@ static int tas2563_codec_remove(struct snd_soc_codec *codec)
 /*static DECLARE_TLV_DB_SCALE(dac_tlv, 0, 100, 0);*/
 static DECLARE_TLV_DB_SCALE(tas2563_digital_tlv, 1100, 50, 0);
 
+static const char * const vboost_ctl_text[] = {
+	"default",
+	"Device(s) AlwaysOn"
+};
+
+static const struct soc_enum vboost_ctl_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(vboost_ctl_text), vboost_ctl_text),
+};
+
+static int tas2563_vboost_ctl_get(struct snd_kcontrol *pKcontrol,
+			struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+	//int nResult = 0, nVBoost = 0;
+
+	mutex_lock(&pTAS2563->codec_lock);
+
+	pValue->value.integer.value[0] = pTAS2563->mnVBoostState;
+
+	mutex_unlock(&pTAS2563->codec_lock);
+	return 0;
+}
+
+static int tas2563_vboost_ctl_put(struct snd_kcontrol *pKcontrol,
+			struct snd_ctl_elem_value *pValue)
+{
+#ifdef KCONTROL_CODEC
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+#else
+	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+#endif
+	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+	int vboost_state = pValue->value.integer.value[0];
+
+	mutex_lock(&pTAS2563->codec_lock);
+
+	if(vboost_state)
+		pTAS2563->update_bits(pTAS2563, TAS2563_BoostConfiguration,
+			TAS2563_BoostConfiguration_BoostMode_Mask,
+			TAS2563_BoostConfiguration_BoostMode_AlwaysOn);
+	else
+		pTAS2563->update_bits(pTAS2563, TAS2563_BoostConfiguration,
+			TAS2563_BoostConfiguration_BoostMode_Mask,
+			TAS2563_BoostConfiguration_BoostMode_ClassH);
+
+	pTAS2563->mnVBoostState = vboost_state;
+	mutex_unlock(&pTAS2563->codec_lock);
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new tas2563_snd_controls[] = {
 	SOC_SINGLE_TLV("Amp Output Level", TAS2563_PlaybackConfigurationReg0,
 		0, 0x16, 0,
@@ -2367,6 +2414,8 @@ static const struct snd_kcontrol_new tas2563_snd_controls[] = {
 		tas2563_configuration_get, tas2563_configuration_put),
 	SOC_SINGLE_EXT("Calibration", SND_SOC_NOPM, 0, 0x00FF, 0,
 		tas2563_calibration_get, tas2563_calibration_put),
+	SOC_ENUM_EXT("VBoost Ctrl", vboost_ctl_enum[0],
+		tas2563_vboost_ctl_get, tas2563_vboost_ctl_put),
 };
 
 static struct snd_soc_codec_driver soc_codec_driver_tas2563 = {
