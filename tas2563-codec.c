@@ -54,7 +54,7 @@
 #define	PPC_DRIVER_MTPLLSRC			0x00000400
 #define	PPC_DRIVER_CFGDEV_NONCRC	0x00000101
 
-#define TAS2563_CAL_NAME    "/data/vendor/pa_cal/tas2563_cal.bin"
+#define TAS2563_CAL_NAME    "/mnt/vendor/persist/audio/tas2563_cal.bin"
 #define RESTART_MAX 3
 
 #define TAS2563_UDELAY 0xFFFFFFFE
@@ -72,8 +72,6 @@
 #define TAS2563_BLOCK_CFG_POST			0x05
 #define TAS2563_BLOCK_CFG_POST_POWER	0x06
 
-static char pICN[] = {0x00, 0x01, 0x09, 0x45};
-static char pICNDelay[] = {0x00, 0x01, 0x00, 0x00};
 static int tas2563_set_fmt(struct tas2563_priv *pTAS2563, unsigned int fmt);
 static void tas2563_clear_firmware(struct TFirmware *pFirmware);
 
@@ -1108,7 +1106,7 @@ static int tas2563_codec_resume(struct snd_soc_codec *codec)
 
 static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 {
-	int nResult = 0;
+	int nResult = 0, irqreg;
 	/*unsigned int nValue;*/
 	const char *pFWName;
 	struct TProgram *pProgram;
@@ -1123,7 +1121,8 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 			pTAS2563->dev, GFP_KERNEL, pTAS2563, tas2563_fw_ready);
 
 		if(nResult < 0) {
-			dev_err(pTAS2563->dev, "%s, firmware is loaded, %d\n", __func__, nResult);
+			dev_err(pTAS2563->dev, "%s, firmware is not loaded, return %d\n",
+					__func__, nResult);
 			goto end;
 		}
 	}
@@ -1162,6 +1161,7 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 
 	switch (state) {
 	case TAS2563_POWER_ACTIVE:
+/*
 		nResult = pTAS2563->update_bits(pTAS2563, TAS2563_PowerControl,
 			TAS2563_PowerControl_OperationalMode10_Mask |
 			TAS2563_PowerControl_ISNSPower_Mask |
@@ -1171,14 +1171,20 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 			TAS2563_PowerControl_ISNSPower_Active);
 		if (nResult < 0)
 			return nResult;
-		pTAS2563->mbPowerUp = true;
-		dev_info(pTAS2563->dev, "set ICN to -90dB\n");
-		nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_REG, pICN, 4);
-		if(nResult < 0)
-			return nResult;
+*/
 
-		dev_info(pTAS2563->dev, "set ICN delay\n");
-		nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_DELAY, pICNDelay, 4);
+//Clear latched IRQ before power on
+		pTAS2563->update_bits(pTAS2563, TAS2563_InterruptConfiguration,
+					TAS2563_InterruptConfiguration_CLEARLATINT_Mask,
+					TAS2563_InterruptConfiguration_CLEARLATINT_CLEAR);
+		pTAS2563->mbPowerUp = true;
+
+		pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
+		dev_info(pTAS2563->dev, "IRQ reg is: %d, %d\n", irqreg, __LINE__);
+
+//		pTAS2563->enableIRQ(pTAS2563, true);
+		schedule_delayed_work(&pTAS2563->irq_work, msecs_to_jiffies(100));
+
 		break;
 
 	case TAS2563_POWER_MUTE:
@@ -1197,6 +1203,7 @@ static int tas2563_set_power_state(struct tas2563_priv *pTAS2563, int state)
 			TAS2563_PowerControl_OperationalMode10_Mask,
 			TAS2563_PowerControl_OperationalMode10_Shutdown);
 			pTAS2563->mbPowerUp = false;
+			pTAS2563->enableIRQ(pTAS2563, false);
 		break;
 
 	default:
@@ -1267,10 +1274,12 @@ static int tas2563_mute(struct snd_soc_dai *dai, int mute)
 static int tas2563_slot_config(struct snd_soc_codec *codec, struct tas2563_priv *pTAS2563, int blr_clk_ratio)
 {
 	int ret = 0;
-	pTAS2563->update_bits(pTAS2563,
+	ret = pTAS2563->update_bits(pTAS2563,
 			TAS2563_TDMConfigurationReg5, 0xff, 0x42);
+	if(ret < 0)
+		return ret;
 
-	pTAS2563->update_bits(pTAS2563,
+	ret = pTAS2563->update_bits(pTAS2563,
 			TAS2563_TDMConfigurationReg6, 0xff, 0x40);
 
 	return ret;
@@ -1474,8 +1483,21 @@ int tas2563_load_default(struct tas2563_priv *pTAS2563)
 	if (ret < 0)
 		goto end;
 
+/*Enable TDM IRQ */
+	ret = pTAS2563->update_bits(pTAS2563, TAS2563_InterruptMaskReg0,
+			TAS2563_InterruptMaskReg0_TDMClockErrorINTMASK_Mask,
+			TAS2563_InterruptMaskReg0_TDMClockErrorINTMASK_Unmask);
+/* disable the DMA5 deglitch filter and halt timer */
+	ret = pTAS2563->update_bits(pTAS2563, TAS2563_CLKERR_Config,
+			TAS2563_CLKERR_Config_DMA5FILTER_Mask,
+			TAS2563_CLKERR_Config_DMA5FILTER_Disable);
+/* disable clk halt timer */
+	ret = pTAS2563->update_bits(pTAS2563, TAS2563_InterruptConfiguration,
+			TAS2563_InterruptConfiguration_CLKHALT_Mask,
+			TAS2563_InterruptConfiguration_CLKHALT_Disable);
+
 end:
-/* power up failed, restart later */
+/* Load default failed, restart later */
 	dev_info(pTAS2563->dev, "%s, %d, ret = %d", __func__, __LINE__, ret);
 	if (ret < 0)
 		schedule_delayed_work(&pTAS2563->irq_work,
@@ -1838,9 +1860,6 @@ int tas2563_set_program(struct tas2563_priv *pTAS2563,
 	if (nResult < 0)
 		goto end;
 	msleep(1);
-	nResult = tas2563_load_default(pTAS2563);
-	if (nResult < 0)
-		goto end;
 
 	dev_info(pTAS2563->dev, "load program %d (%s)\n", nProgram, pProgram->mpName);
 	nResult = tas2563_load_data(pTAS2563, &(pProgram->mData), TAS2563_BLOCK_PGM_DEV_A);
@@ -1849,6 +1868,10 @@ int tas2563_set_program(struct tas2563_priv *pTAS2563,
 	pTAS2563->mnCurrentProgram = nProgram;
 
 	nResult = tas2563_load_coefficient(pTAS2563, -1, nConfiguration, false);
+	if (nResult < 0)
+		goto end;
+
+	nResult = tas2563_load_default(pTAS2563);
 	if (nResult < 0)
 		goto end;
 
@@ -1863,7 +1886,7 @@ int tas2563_set_program(struct tas2563_priv *pTAS2563,
 
 	if (pTAS2563->mbPowerUp) {
 //		pTAS2563->clearIRQ(pTAS2563);
-//		dev_info(pTAS2563->dev, "device powered up, load startup\n");
+		dev_info(pTAS2563->dev, "device powered up, load startup\n");
 		nResult = tas2563_set_power_state(pTAS2563, TAS2563_POWER_MUTE);
 
 		if (nResult < 0)
@@ -2083,7 +2106,7 @@ static int tas2563_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
-	int ret = 0;
+	int nResult = 0;
 	int blr_clk_ratio;
 
 	dev_info(pTAS2563->dev, "%s, format: %d\n", __func__,
@@ -2091,10 +2114,10 @@ static int tas2563_hw_params(struct snd_pcm_substream *substream,
 
 	mutex_lock(&pTAS2563->codec_lock);
 
-	ret = tas2563_set_bitwidth(pTAS2563, params_format(params));
-	if(ret < 0)
+	nResult = tas2563_set_bitwidth(pTAS2563, params_format(params));
+	if(nResult < 0)
 	{
-		dev_info(pTAS2563->dev, "set bitwidth failed, %d\n", ret);
+		dev_info(pTAS2563->dev, "set bitwidth failed, %d\n", nResult);
 		goto ret;
 	}
 
@@ -2106,11 +2129,11 @@ static int tas2563_hw_params(struct snd_pcm_substream *substream,
 	dev_info(pTAS2563->dev, "%s, sample rate: %d\n", __func__,
 		params_rate(params));
 
-	ret = tas2563_set_samplerate(pTAS2563, params_rate(params));
+	nResult = tas2563_set_samplerate(pTAS2563, params_rate(params));
 
 ret:
 	mutex_unlock(&pTAS2563->codec_lock);
-	return ret;
+	return nResult;
 }
 
 static int tas2563_set_fmt(struct tas2563_priv *pTAS2563, unsigned int fmt)

@@ -38,7 +38,7 @@
 #include "tiload.h"
 
 /* enable debug prints in the driver */
-//#define DEBUG
+#define DEBUG
 
 static struct cdev *tiload_cdev;
 static int tiload_major; /* Dynamic allocation of Mjr No. */
@@ -144,8 +144,8 @@ static ssize_t tiload_read(struct file *filp, char __user *buf,
 	dev_info(pTAS2563->dev, "read size = %d, reg_addr= %x , count = %d\n",
 		(int) size, reg_addr, (int) count);
 /*	for (i = 0; i < (int) size; i++) {
-*		dev_dbg(pTAS2563->dev, "rd_data[%d]=%x\n", i, rd_data[i]);
-*	}
+		dev_dbg(pTAS2563->dev, "rd_data[%d]=%x\n", i, rd_data[i]);
+	}
 */
 #endif
 	if (size != count)

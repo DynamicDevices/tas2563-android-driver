@@ -524,9 +524,12 @@ struct TYCRC {
 
     /* Interrupt Configuration */
 #define TAS2563_InterruptConfiguration  TAS2563_REG(0x0, 0x0, 0x30)
-#define TAS2563_InterruptConfiguration_INTTHRUSW_Mask  (0x1 << 2),
-#define TAS2563_InterruptConfiguration_INTTHRUSW_IntOnIRQZ  (0x0 << 2)
-#define TAS2563_InterruptConfiguration_INTTHRUSW_IntFor2ms  (0x1 << 2)
+#define TAS2563_InterruptConfiguration_CLKHALT_Mask (0x1 << 6)
+#define TAS2563_InterruptConfiguration_CLKHALT_Enable (0x0 << 6)
+#define TAS2563_InterruptConfiguration_CLKHALT_Disable (0x1 << 6)
+#define TAS2563_InterruptConfiguration_CLEARLATINT_Mask  (0x1 << 2)
+#define TAS2563_InterruptConfiguration_CLEARLATINT_NOCLEAR  (0x0 << 2)
+#define TAS2563_InterruptConfiguration_CLEARLATINT_CLEAR  (0x1 << 2)
 #define TAS2563_InterruptConfiguration_PININTConfig10_Mask  (0x3 << 0)
 #define TAS2563_InterruptConfiguration_PININTConfig10_AssertOnLiveInterrupts \
 	(0x0 << 0)
@@ -647,6 +650,11 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 #define TAS2563_I2CChecksum  TAS2563_REG(0x0, 0x0, 0x7E)
 #define TAS2563_I2CChecksum_I2CChecksum70_Mask  (0xff << 0)
 
+#define TAS2563_CLKERR_Config TAS2563_REG(0x0, 0x1, 0x31)
+#define TAS2563_CLKERR_Config_DMA5FILTER_Mask (0x1 << 1)
+#define TAS2563_CLKERR_Config_DMA5FILTER_Enable (0x0 << 0)
+#define TAS2563_CLKERR_Config_DMA5FILTER_Disable (0x1 << 1)
+
 #define TAS2563_SA_COEFF_SWAP_REG	TAS2563_REG(0, 0x35, 0x2c)
 #define TAS2563_CALI_T_REG	TAS2563_REG(0x8c, 0x30, 0x20)
 #define TAS2563_CALI_R0_REG		TAS2563_REG(0x8c, 0x2f, 0x40)
@@ -658,7 +666,7 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 
     /* Book */
 #define TAS2563_Book  TAS2563_REG(0x0, 0x0, 0x7F)
-#define TAS2563_Book_Book70_Mask  (0xff << 0)
+#define TAS2563_Book_Mask  (0xff << 0)
 
 #define TAS2563_FW_NAME     "tas2563_uCDSP.bin"
 
@@ -687,7 +695,7 @@ TAS2563_InterruptConfiguration_PININTConfig10_Assert2msOnLatchedInterrupts \
 #define ERROR_UNDER_VOLTAGE	0x0000010
 #define ERROR_BROWNOUT		0x0000020
 #define ERROR_CLASSD_PWR	0x0000040
-#define ERROR_FAILSAFE      	0x4000000
+#define ERROR_FAILSAFE		0x4000000
 
 #define TAS2563_COEFFICIENT_TMAX	0x7fffffff
 #define TAS2563_SAFE_GUARD_PATTERN	0x5a
