@@ -635,6 +635,7 @@ static int tas2563_i2c_probe(struct i2c_client *pClient,
 	unsigned int nValue = 0;
 	const char *pFWName;
 
+	dev_err(&pClient->dev, "Driver ID: %s\n", TAS2563_DRIVER_ID);
 	dev_info(&pClient->dev, "%s enter\n", __func__);
 
 	pTAS2563 = devm_kzalloc(&pClient->dev, sizeof(struct tas2563_priv), GFP_KERNEL);

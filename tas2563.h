@@ -2,6 +2,8 @@
 #ifndef __TAS2563_
 #define __TAS2563_
 
+#define TAS2563_DRIVER_ID           "1.0.0"
+
 #define TAS2563_YRAM_BOOK1				140
 
 #define TAS2563_YRAM1_PAGE				42
