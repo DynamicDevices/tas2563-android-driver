@@ -117,9 +117,8 @@ static int tas2563_dev_read(struct tas2563_priv *pTAS2563,
 		dev_err(pTAS2563->dev, "%s, ERROR, L=%d, E=%d\n",
 			__func__, __LINE__, nResult);
 	else
-		dev_dbg(pTAS2563->dev,
-			"%s: BOOK:PAGE:REG 0x%02x:0x%02x:0x%02x,0x%02x\n", 
-			__func__, TAS2563_BOOK_ID(reg), TAS2563_PAGE_ID(reg),
+		dev_dbg(pTAS2563->dev, "%s: BOOK:PAGE:REG %u:%u:%u,%x\n", __func__,
+			TAS2563_BOOK_ID(reg), TAS2563_PAGE_ID(reg),
 			TAS2563_PAGE_REG(reg), *pValue);
 
 end:
@@ -145,8 +144,7 @@ static int tas2563_dev_write(struct tas2563_priv *pTAS2563,
 		dev_err(pTAS2563->dev, "%s, ERROR, L=%d, E=%d\n",
 			__func__, __LINE__, nResult);
 	else
-		dev_dbg(pTAS2563->dev,
-			"%s: BOOK:PAGE:REG 0x%02x:0x%02x:0x%02x, VAL: 0x%02x\n",
+		dev_dbg(pTAS2563->dev, "%s: BOOK:PAGE:REG %u:%u:%u, VAL: 0x%02x\n",
 			__func__, TAS2563_BOOK_ID(reg), TAS2563_PAGE_ID(reg),
 			TAS2563_PAGE_REG(reg), value);
 
@@ -173,8 +171,7 @@ static int tas2563_dev_bulk_write(struct tas2563_priv *pTAS2563,
 		dev_err(pTAS2563->dev, "%s, ERROR, L=%d, E=%d\n",
 			__func__, __LINE__, nResult);
 	else
-		dev_dbg(pTAS2563->dev,
-			"%s: BOOK:PAGE:REG 0x%02x:0x%02x:0x%02x, len: 0x%02x\n",
+		dev_dbg(pTAS2563->dev, "%s: BOOK:PAGE:REG %u:%u:%u, len: 0x%02x\n",
 			__func__, TAS2563_BOOK_ID(reg), TAS2563_PAGE_ID(reg),
 			TAS2563_PAGE_REG(reg), nLength);
 
@@ -196,8 +193,7 @@ static int tas2563_dev_bulk_read(struct tas2563_priv *pTAS2563,
 	if (nResult < 0)
 		goto end;
 
-	dev_dbg(pTAS2563->dev,
-		"reg = %u, pData = %s, Lenth = %d", reg, pData, nLength);
+	dev_dbg(pTAS2563->dev, "reg = %u, pData = %s, Lenth = %d", reg, pData, nLength);
 
 	#define STRIDE 4
 	/* Read chunk bytes defined by STRIDE */
@@ -206,8 +202,7 @@ static int tas2563_dev_bulk_read(struct tas2563_priv *pTAS2563,
 							TAS2563_PAGE_REG((reg + i*STRIDE)),
 							&pData[i*STRIDE], STRIDE);
 			if (nResult < 0) {
-					dev_err(pTAS2563->dev,
-						"%s, %d, I2C error %d\n",
+					dev_err(pTAS2563->dev, "%s, %d, I2C error %d\n",
 							__func__, __LINE__, nResult);
 					pTAS2563->mnErrCode |= ERROR_DEVA_I2C_COMM;
 			} else
@@ -220,8 +215,7 @@ static int tas2563_dev_bulk_read(struct tas2563_priv *pTAS2563,
 							TAS2563_PAGE_REG(reg + i*STRIDE),
 							&pData[i*STRIDE], (nLength % STRIDE));
 			if (nResult < 0) {
-					dev_err(pTAS2563->dev,
-						"%s, %d, I2C error %d\n",
+					dev_err(pTAS2563->dev, "%s, %d, I2C error %d\n",
 							__func__, __LINE__, nResult);
 					pTAS2563->mnErrCode |= ERROR_DEVA_I2C_COMM;
 			} else
@@ -251,7 +245,7 @@ static int tas2563_dev_update_bits(struct tas2563_priv *pTAS2563,
 		dev_err(pTAS2563->dev, "%s, ERROR, L=%d, E=%d\n",
 			__func__, __LINE__, nResult);
 	else
-		dev_dbg(pTAS2563->dev, "%s: BOOK:PAGE:REG 0x%02x:0x%02x:0x%02x, mask: 0x%02x, val=0x%02x\n",
+		dev_dbg(pTAS2563->dev, "%s: BOOK:PAGE:REG %u:%u:%u, mask: 0x%x, val=0x%x\n",
 			__func__, TAS2563_BOOK_ID(reg), TAS2563_PAGE_ID(reg),
 			TAS2563_PAGE_REG(reg), mask, value);
 end:
@@ -315,17 +309,15 @@ void tas2563_enableIRQ(struct tas2563_priv *pTAS2563, bool enable)
 	if (enable) {
 		if (pTAS2563->mbIRQEnable)
 			return;
-#ifdef CONFIG_TAS2563_ENABLE_IRQ
+
 		if (gpio_is_valid(pTAS2563->mnIRQGPIO))
 			enable_irq(pTAS2563->mnIRQ);
-#endif
+
 		schedule_delayed_work(&pTAS2563->irq_work, msecs_to_jiffies(10));
 		pTAS2563->mbIRQEnable = true;
 	} else {
-#ifdef CONFIG_TAS2563_ENABLE_IRQ
 		if (gpio_is_valid(pTAS2563->mnIRQGPIO))
 			disable_irq_nosync(pTAS2563->mnIRQ);
-#endif
 		pTAS2563->mbIRQEnable = false;
 	}
 }
@@ -414,56 +406,13 @@ static void irq_work_routine(struct work_struct *work)
 			if (nResult < 0)
 				goto reload;
 
-			pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
-			dev_info(pTAS2563->dev, "IRQ reg is: %s, %d, %d\n", __func__, irqreg, __LINE__);
-#ifdef CONFIG_TAS2563_STANDALONE_RECORD
-			if (((nDevInt1Status & TAS2563_PowerControl_PDM_I2S_MODE_Mask)
-				!= TAS2563_PowerControl_PDM_I2S_MODE_Disable)&&(pTAS2563->cstream == 1 && pTAS2563->pstream ==0)) {
-				dev_info(pTAS2563->dev, "%s %u\n", __func__, __LINE__);
-				break;		
-			}
-
-			if ((((nDevInt1Status & TAS2563_PowerControl_OperationalMode10_Mask)
+			if ((nDevInt1Status & TAS2563_PowerControl_OperationalMode10_Mask)
 				!= TAS2563_PowerControl_OperationalMode10_Shutdown)
-				||((nDevInt1Status & TAS2563_PowerControl_PDM_I2S_MODE_Mask)
-				!= TAS2563_PowerControl_PDM_I2S_MODE_Disable))&&(pTAS2563->pstream ==1)) {
-				dev_info(pTAS2563->dev, "%s %u\n", __func__, __LINE__);
-				break;		
-			}
-
-
-				if (pTAS2563->pstream == 1) {
-					dev_info(pTAS2563->dev, "%s %u\n", __func__, __LINE__);
-					nResult = pTAS2563->update_bits(pTAS2563, TAS2563_PowerControl,
-						TAS2563_PowerControl_PDM_I2S_MODE_Mask |
-						TAS2563_PowerControl_OperationalMode10_Mask |
-						TAS2563_PowerControl_ISNSPower_Mask |
-						TAS2563_PowerControl_VSNSPower_Mask,
-						TAS2563_PowerControl_PDM_I2S_MODE_Disable |
-						TAS2563_PowerControl_OperationalMode10_Active |
-						TAS2563_PowerControl_VSNSPower_Active |
-						TAS2563_PowerControl_ISNSPower_Active);
-					if (nResult < 0)
-						goto reload;
-				} else if (pTAS2563->cstream == 1 && pTAS2563->pstream ==0) {
-				dev_info(pTAS2563->dev, "%s %u\n", __func__, __LINE__);
-					nResult = pTAS2563->update_bits(pTAS2563, TAS2563_PowerControl,
-						TAS2563_PowerControl_PDM_I2S_MODE_Mask | 
-						TAS2563_PowerControl_OperationalMode10_Mask |
-						TAS2563_PowerControl_ISNSPower_Mask |
-						TAS2563_PowerControl_VSNSPower_Mask,
-						TAS2563_PowerControl_PDM_I2S_MODE_Enable |
-						TAS2563_PowerControl_OperationalMode10_Active |
-						TAS2563_PowerControl_VSNSPower_PoweredDown |
-						TAS2563_PowerControl_ISNSPower_PoweredDown);
-					if (nResult < 0)
-						goto reload;
-				}
-#else
-           if ((nDevInt1Status & TAS2563_PowerControl_OperationalMode10_Mask)
-				!= TAS2563_PowerControl_OperationalMode10_Shutdown) {
 				break;
-			}
+
+			pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
+			dev_info(pTAS2563->dev, "IRQ reg is: %s %d, %d\n", __func__, irqreg, __LINE__);
+
 			nResult = pTAS2563->update_bits(pTAS2563, TAS2563_PowerControl,
 				TAS2563_PowerControl_OperationalMode10_Mask |
 				TAS2563_PowerControl_ISNSPower_Mask |
@@ -473,30 +422,30 @@ static void irq_work_routine(struct work_struct *work)
 				TAS2563_PowerControl_ISNSPower_Active);
 			if (nResult < 0)
 				goto reload;
-#endif
-				pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
-				dev_info(pTAS2563->dev, "IRQ reg is: %s, %d, %d\n", __func__, irqreg, __LINE__);
 
-				dev_info(pTAS2563->dev, "set ICN to -90dB\n");
-				nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_REG, pICN, 4);
-				if(nResult < 0)
-					goto reload;
+			pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
+			dev_info(pTAS2563->dev, "IRQ reg is: %s, %d, %d\n", __func__, irqreg, __LINE__);
 
-				pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
-				dev_info(pTAS2563->dev, "IRQ reg is: %d, %d\n", irqreg, __LINE__);
+			dev_info(pTAS2563->dev, "set ICN to -90dB\n");
+			nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_REG, pICN, 4);
+			if(nResult < 0)
+				goto reload;
 
-				dev_info(pTAS2563->dev, "set ICN delay\n");
-				nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_DELAY, pICNDelay, 4);
+			pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
+			dev_info(pTAS2563->dev, "IRQ reg is: %d, %d\n", irqreg, __LINE__);
 
-				pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
-				dev_info(pTAS2563->dev, "IRQ reg is: %d, %d\n", irqreg, __LINE__);
+			dev_info(pTAS2563->dev, "set ICN delay\n");
+			nResult = pTAS2563->bulk_write(pTAS2563, TAS2563_ICN_DELAY, pICNDelay, 4);
 
-				nCounter--;
-				if (nCounter > 0) {
-					/* in case check power status just after power on TAS2563 */
-					dev_dbg(pTAS2563->dev, "PowSts B: 0x%x, check again after 10ms\n",
-						nDevInt1Status);
-					msleep(20);
+			pTAS2563->read(pTAS2563, TAS2563_LatchedInterruptReg0, &irqreg);
+			dev_info(pTAS2563->dev, "IRQ reg is: %d, %d\n", irqreg, __LINE__);
+
+			nCounter--;
+			if (nCounter > 0) {
+				/* in case check power status just after power on TAS2563 */
+				dev_dbg(pTAS2563->dev, "PowSts B: 0x%x, check again after 10ms\n",
+					nDevInt1Status);
+				msleep(20);
 			}
 		}
 
@@ -639,14 +588,14 @@ static int tas2563_runtime_suspend(struct tas2563_priv *pTAS2563)
 	dev_dbg(pTAS2563->dev, "%s\n", __func__);
 
 	pTAS2563->mbRuntimeSuspend = true;
-#ifdef CONFIG_TAS2563_ENABLE_IRQ
+
 	if (gpio_is_valid(pTAS2563->mnIRQGPIO)) {
 		if (delayed_work_pending(&pTAS2563->irq_work)) {
 			dev_dbg(pTAS2563->dev, "cancel IRQ work\n");
 			cancel_delayed_work_sync(&pTAS2563->irq_work);
 		}
 	}
-#endif
+
 	return 0;
 }
 
@@ -748,33 +697,30 @@ static int tas2563_i2c_probe(struct i2c_client *pClient,
 	dev_info(pTAS2563->dev, "PGID: %d\n", pTAS2563->mnPGID);
 	pFWName = TAS2563_FW_NAME;
 
-#ifdef CONFIG_TAS2563_ENABLE_IRQ
 	if (gpio_is_valid(pTAS2563->mnIRQGPIO)) {
-			nResult = gpio_request(pTAS2563->mnIRQGPIO, "TAS2563-IRQ");
-			if (nResult < 0) {
-				dev_err(pTAS2563->dev,
-					"%s: GPIO %d request INT error\n",
-					__func__, pTAS2563->mnIRQGPIO);
-				goto err;
-			}
+		nResult = gpio_request(pTAS2563->mnIRQGPIO, "TAS2563-IRQ");
+		if (nResult < 0) {
+			dev_err(pTAS2563->dev,
+				"%s: GPIO %d request INT error\n",
+				__func__, pTAS2563->mnIRQGPIO);
+			goto err;
+		}
 
-			gpio_direction_input(pTAS2563->mnIRQGPIO);
-			pTAS2563->mnIRQ = gpio_to_irq(pTAS2563->mnIRQGPIO);
-			dev_dbg(pTAS2563->dev, "irq = %d\n", pTAS2563->mnIRQ);
-			INIT_DELAYED_WORK(&pTAS2563->irq_work, irq_work_routine);
-			nResult = request_threaded_irq(pTAS2563->mnIRQ, tas2563_irq_handler,
-						NULL, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-						pClient->name, pTAS2563);
-			if (nResult < 0) {
-				dev_err(pTAS2563->dev,
-					"request_irq failed, %d\n", nResult);
-				goto err;
-			}
-			disable_irq_nosync(pTAS2563->mnIRQ);
+		gpio_direction_input(pTAS2563->mnIRQGPIO);
+		pTAS2563->mnIRQ = gpio_to_irq(pTAS2563->mnIRQGPIO);
+		dev_dbg(pTAS2563->dev, "irq = %d\n", pTAS2563->mnIRQ);
+		INIT_DELAYED_WORK(&pTAS2563->irq_work, irq_work_routine);
+		nResult = request_threaded_irq(pTAS2563->mnIRQ, tas2563_irq_handler,
+					NULL, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+					pClient->name, pTAS2563);
+		if (nResult < 0) {
+			dev_err(pTAS2563->dev,
+				"request_irq failed, %d\n", nResult);
+			goto err;
+		}
+		disable_irq_nosync(pTAS2563->mnIRQ);
 	}
-#else
-	INIT_DELAYED_WORK(&pTAS2563->irq_work, irq_work_routine);
-#endif
+
 	pTAS2563->mpFirmware = devm_kzalloc(&pClient->dev, sizeof(struct TFirmware), GFP_KERNEL);
 	if (!pTAS2563->mpFirmware) {
 		nResult = -ENOMEM;
