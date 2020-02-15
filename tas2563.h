@@ -1,4 +1,3 @@
-
 #ifndef __TAS2563_
 #define __TAS2563_
 
@@ -94,7 +93,7 @@ struct TYCRC {
 #define TAS2563_PlaybackConfigurationReg0_PlaybackSource_Mask  (0x1 << 5)
 #define TAS2563_PlaybackConfigurationReg0_PlaybackSource_Pcm  (0x0 << 5)
 #define TAS2563_PlaybackConfigurationReg0_PlaybackSource_Pdm  (0x1 << 5)
-#define TAS2563_PlaybackConfigurationReg0_AmplifierLevel40_Mask  (0x1f << 0)
+#define TAS2563_PlaybackConfigurationReg0_AmplifierLevel40_Mask  (0x1f << 1)
 
     /* Misc Configuration Reg0 */
 #define TAS2563_MiscConfigurationReg0  TAS2563_REG(0x0, 0x0, 0x04)
