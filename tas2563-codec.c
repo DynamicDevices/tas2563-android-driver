@@ -1602,6 +1602,7 @@ static int tas2563_load_coefficient(struct tas2563_priv *pTAS2563,
 		nResult = tas2563_set_power_state(pTAS2563, TAS2563_POWER_ACTIVE);
 		if (nResult < 0)
 			goto end;
+		pProgram = &(pTAS2563->mpFirmware->mpPrograms[pTAS2563->mnCurrentProgram]);
 		if (pProgram->mnAppMode == TAS2563_APP_TUNINGMODE) {
 			pTAS2563->enableIRQ(pTAS2563, true);
 			if (!hrtimer_active(&pTAS2563->mtimerwork)) {
