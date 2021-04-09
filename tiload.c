@@ -128,12 +128,12 @@ static ssize_t tiload_read(struct file *filp, char __user *buf,
 	dev_dbg(pTAS2563->dev, " nCompositeRegister:0x%x  gBook:0x%x gpage:0x%x \n", nCompositeRegister, gBook, gPage);
 	if (count == 1) {
 		ret =
-			pTAS2563->read(pTAS2563, 0x80000000 | nCompositeRegister, &Value);
+			pTAS2563->read(pTAS2563, nCompositeRegister, &Value);
 		if (ret >= 0)
 			rd_data[0] = (char) Value;
 	} else if (count > 1) {
 		ret =
-			pTAS2563->bulk_read(pTAS2563, 0x80000000 | nCompositeRegister,
+			pTAS2563->bulk_read(pTAS2563, nCompositeRegister,
 			rd_data, size);
 	}
 	if (ret < 0)
@@ -215,11 +215,11 @@ static ssize_t tiload_write(struct file *filp, const char __user *buf,
 	nCompositeRegister = BPR_REG(gBook, gPage, nRegister);
 	if (count == 2) {
 		ret =
-			pTAS2563->write(pTAS2563, 0x80000000 | nCompositeRegister,
+			pTAS2563->write(pTAS2563, nCompositeRegister,
 			pData[1]);
 	} else if (count > 2) {
 		ret =
-			pTAS2563->bulk_write(pTAS2563, 0x80000000 | nCompositeRegister,
+			pTAS2563->bulk_write(pTAS2563, nCompositeRegister,
 			&pData[1], count - 1);
 	}
 
