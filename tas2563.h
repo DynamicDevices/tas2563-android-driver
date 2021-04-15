@@ -794,7 +794,7 @@ struct TFirmware {
 struct tas2563_priv {
 	struct device *dev;
 	struct regmap *regmap;
-	struct snd_soc_codec *codec;
+	void *codec;
 	struct mutex dev_lock;
 	struct delayed_work irq_work;
 	struct hrtimer mtimerwork;
