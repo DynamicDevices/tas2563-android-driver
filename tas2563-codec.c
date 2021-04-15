@@ -35,7 +35,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/slab.h>
-#include <linux/slab.h>
+
 #include <linux/syscalls.h>
 #include <linux/fcntl.h>
 #include <sound/core.h>
@@ -45,6 +45,7 @@
 #include <sound/initval.h>
 #include <sound/tlv.h>
 #include <linux/crc8.h>
+#include <linux/version.h>
 
 #include "tas2563.h"
 #include "tas2563-codec.h"
@@ -86,10 +87,17 @@ static int tas2563_load_configuration(struct tas2563_priv *pTAS2563,
 static int tas2563_load_coefficient(struct tas2563_priv *pTAS2563,
 	int nPrevConfig, int nNewConfig, bool bPowerOn);
 
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static unsigned int tas2563_codec_read(struct snd_soc_component *codec,
+		unsigned int reg)
+{
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 static unsigned int tas2563_codec_read(struct snd_soc_codec *codec,
 		unsigned int reg)
 {
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif	
 	int nResult = 0;
 	unsigned int value = 0;
 
@@ -702,10 +710,17 @@ end:
 	return nResult;
 }
 
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static int tas2563_codec_write(struct snd_soc_component *codec, unsigned int reg,
+	unsigned int value)
+{
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 static int tas2563_codec_write(struct snd_soc_codec *codec, unsigned int reg,
 	unsigned int value)
 {
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	int nResult = 0;
 
@@ -1075,10 +1090,15 @@ static int fw_parse(struct tas2563_priv *pTAS2563,
 	return 0;
 }
 
-
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static int tas2563_codec_suspend(struct snd_soc_component *codec)
+{
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 static int tas2563_codec_suspend(struct snd_soc_codec *codec)
 {
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 	int ret = 0;
 
 	mutex_lock(&pTAS2563->codec_lock);
@@ -1090,9 +1110,15 @@ static int tas2563_codec_suspend(struct snd_soc_codec *codec)
 	return ret;
 }
 
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static int tas2563_codec_resume(struct snd_soc_component *codec)
+{
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 static int tas2563_codec_resume(struct snd_soc_codec *codec)
 {
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 	int ret = 0;
 
 	mutex_lock(&pTAS2563->codec_lock);
@@ -1219,12 +1245,17 @@ end:
 static int tas2563_dac_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec = snd_soc_dapm_to_component(w->dapm);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 #else
 	struct snd_soc_codec *codec = w->codec;
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -1252,10 +1283,15 @@ static const struct snd_soc_dapm_route tas2563_audio_map[] = {
 	{"OUT", NULL, "DAC"},
 };
 
-static int tas2563_mute(struct snd_soc_dai *dai, int mute)
-{
+static int tas2563_mute(struct snd_soc_dai *dai, int mute, int stream)
+{	
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec = dai->component;
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif	
 
         dev_info(pTAS2563->dev, "%s\n", __func__);
 	mutex_lock(&pTAS2563->codec_lock);
@@ -1271,7 +1307,7 @@ static int tas2563_mute(struct snd_soc_dai *dai, int mute)
 }
 
 
-static int tas2563_slot_config(struct snd_soc_codec *codec, struct tas2563_priv *pTAS2563, int blr_clk_ratio)
+static int tas2563_slot_config(void *codec, struct tas2563_priv *pTAS2563, int blr_clk_ratio)
 {
 	int ret = 0;
 	ret = pTAS2563->update_bits(pTAS2563,
@@ -2062,12 +2098,18 @@ end:
 static int tas2563_configuration_get(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	mutex_lock(&pTAS2563->codec_lock);
 
@@ -2082,12 +2124,18 @@ static int tas2563_configuration_get(struct snd_kcontrol *pKcontrol,
 static int tas2563_configuration_put(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 	unsigned int nConfiguration = pValue->value.integer.value[0];
 	int ret = 0;
 
@@ -2105,8 +2153,15 @@ static int tas2563_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params,
 		struct snd_soc_dai *dai)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec = dai->component;
+	struct tas2563_priv *pTAS2563
+			= snd_soc_component_get_drvdata(codec);
+#else
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	int nResult = 0;
 	int blr_clk_ratio;
 
@@ -2198,8 +2253,14 @@ static int tas2563_set_fmt(struct tas2563_priv *pTAS2563, unsigned int fmt)
 
 static int tas2563_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec = dai->component;
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	int ret = 0;
 
 	dev_info(pTAS2563->dev, "%s, format=0x%x\n", __func__, fmt);
@@ -2217,8 +2278,13 @@ static int tas2563_set_dai_tdm_slot(struct snd_soc_dai *dai,
 		int slots, int slot_width)
 {
 	int ret = 0;
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec = dai->component;
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 	struct snd_soc_codec *codec = dai->codec;
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	dev_info(pTAS2563->dev, "%s, tx_mask:%d, rx_mask:%d, slots:%d, slot_width:%d",
 			__func__, tx_mask, rx_mask, slots, slot_width);
@@ -2231,12 +2297,18 @@ static int tas2563_set_dai_tdm_slot(struct snd_soc_dai *dai,
 static int tas2563_program_get(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	mutex_lock(&pTAS2563->codec_lock);
 
@@ -2251,12 +2323,19 @@ static int tas2563_program_get(struct snd_kcontrol *pKcontrol,
 static int tas2563_program_put(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	unsigned int nProgram = pValue->value.integer.value[0];
 	int ret = 0, nConfiguration = -1;
 
@@ -2273,12 +2352,18 @@ static int tas2563_program_put(struct snd_kcontrol *pKcontrol,
 static int tas2563_calibration_get(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
 
 	mutex_lock(&pTAS2563->codec_lock);
 
@@ -2294,12 +2379,19 @@ static int tas2563_calibration_get(struct snd_kcontrol *pKcontrol,
 static int tas2563_calibration_put(struct snd_kcontrol *pKcontrol,
 	struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	unsigned int nCalibration = pValue->value.integer.value[0];
 	int ret = 0;
 
@@ -2312,7 +2404,7 @@ static int tas2563_calibration_put(struct snd_kcontrol *pKcontrol,
 }
 
 static struct snd_soc_dai_ops tas2563_dai_ops = {
-	.digital_mute = tas2563_mute,
+	.mute_stream = tas2563_mute,
 	.hw_params  = tas2563_hw_params,
 	.set_fmt    = tas2563_set_dai_fmt,
 	.set_tdm_slot = tas2563_set_dai_tdm_slot,
@@ -2351,21 +2443,21 @@ static struct snd_soc_dai_driver tas2563_dai_driver[] = {
 	},
 };
 
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static int tas2563_codec_probe(struct snd_soc_component *codec)
+{
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 static int tas2563_codec_probe(struct snd_soc_codec *codec)
 {
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
-
+#endif
 	pTAS2563->codec = codec;
 	pTAS2563->set_calibration = tas2563_set_calibration;
 	pTAS2563->set_config = tas2563_set_config;
 
 	dev_err(pTAS2563->dev, "%s\n", __func__);
 
-	return 0;
-}
-
-static int tas2563_codec_remove(struct snd_soc_codec *codec)
-{
 	return 0;
 }
 
@@ -2384,12 +2476,19 @@ static const struct soc_enum vboost_ctl_enum[] = {
 static int tas2563_vboost_ctl_get(struct snd_kcontrol *pKcontrol,
 			struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	//int nResult = 0, nVBoost = 0;
 
 	mutex_lock(&pTAS2563->codec_lock);
@@ -2403,12 +2502,19 @@ static int tas2563_vboost_ctl_get(struct snd_kcontrol *pKcontrol,
 static int tas2563_vboost_ctl_put(struct snd_kcontrol *pKcontrol,
 			struct snd_ctl_elem_value *pValue)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	struct snd_soc_component *codec
+					= snd_soc_kcontrol_component(pKcontrol);
+	struct tas2563_priv *pTAS2563 = snd_soc_component_get_drvdata(codec);
+#else
 #ifdef KCONTROL_CODEC
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
 #else
 	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
 #endif
 	struct tas2563_priv *pTAS2563 = snd_soc_codec_get_drvdata(codec);
+#endif
+
 	int vboost_state = pValue->value.integer.value[0];
 
 	mutex_lock(&pTAS2563->codec_lock);
@@ -2442,9 +2548,24 @@ static const struct snd_kcontrol_new tas2563_snd_controls[] = {
 		tas2563_vboost_ctl_get, tas2563_vboost_ctl_put),
 };
 
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+static struct snd_soc_component_driver soc_codec_driver_tas2563 = {
+	.probe			= tas2563_codec_probe,
+	.read			= tas2563_codec_read,
+	.write			= tas2563_codec_write,
+	.suspend		= tas2563_codec_suspend,
+	.resume			= tas2563_codec_resume,
+
+	.controls		= tas2563_snd_controls,
+	.num_controls		= ARRAY_SIZE(tas2563_snd_controls),
+	.dapm_widgets		= tas2563_dapm_widgets,
+	.num_dapm_widgets	= ARRAY_SIZE(tas2563_dapm_widgets),
+	.dapm_routes		= tas2563_audio_map,
+	.num_dapm_routes	= ARRAY_SIZE(tas2563_audio_map),
+};
+#else
 static struct snd_soc_codec_driver soc_codec_driver_tas2563 = {
 	.probe			= tas2563_codec_probe,
-	.remove			= tas2563_codec_remove,
 	.read			= tas2563_codec_read,
 	.write			= tas2563_codec_write,
 	.suspend		= tas2563_codec_suspend,
@@ -2462,22 +2583,31 @@ static struct snd_soc_codec_driver soc_codec_driver_tas2563 = {
 	},
 #endif
 };
-
+#endif
 int tas2563_register_codec(struct tas2563_priv *pTAS2563)
 {
 	int nResult = 0;
 
 	dev_info(pTAS2563->dev, "%s, enter\n", __func__);
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	nResult = snd_soc_register_component(pTAS2563->dev,
+		&soc_codec_driver_tas2563,
+		tas2563_dai_driver, ARRAY_SIZE(tas2563_dai_driver));
+#else	
 	nResult = snd_soc_register_codec(pTAS2563->dev,
 		&soc_codec_driver_tas2563,
 		tas2563_dai_driver, ARRAY_SIZE(tas2563_dai_driver));
+#endif		
 	return nResult;
 }
 
 int tas2563_deregister_codec(struct tas2563_priv *pTAS2563)
 {
+#if KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE
+	snd_soc_unregister_component(pTAS2563->dev);
+#else
 	snd_soc_unregister_codec(pTAS2563->dev);
-
+#endif
 	return 0;
 }
 
