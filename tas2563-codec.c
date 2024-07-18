@@ -665,6 +665,8 @@ end:
 	return nResult;
 }
 
+#if 0
+
 static int tas2563_load_calibration(struct tas2563_priv *pTAS2563,	char *pFileName)
 {
 	int nResult = 0;
@@ -709,6 +711,8 @@ end:
 
 	return nResult;
 }
+
+#endif
 
 #if KERNEL_VERSION(4, 14, 0) < LINUX_VERSION_CODE
 static int tas2563_codec_write(struct snd_soc_component *codec, unsigned int reg,
@@ -1976,12 +1980,15 @@ static int tas2563_set_calibration(struct tas2563_priv *pTAS2563, int nCalibrati
 	}
 
 	if (nCalibration == 0x00FF) {
+#if 0
 		nResult = tas2563_load_calibration(pTAS2563, TAS2563_CAL_NAME);
 		if (nResult < 0) {
 			dev_info(pTAS2563->dev, "load new calibration file %s fail %d\n",
 				TAS2563_CAL_NAME, nResult);
 			goto end;
 		}
+#endif
+		dev_err(pTAS2563->dev, "TBD: Loading calibration file not implemented\n");
 		nCalibration = 0;
 	}
 
@@ -2439,7 +2446,7 @@ static struct snd_soc_dai_driver tas2563_dai_driver[] = {
 			.formats    = TAS2563_FORMATS,
 		},
 		.ops = &tas2563_dai_ops,
-		.symmetric_rates = 1,
+//		.symmetric_rates = 1,
 	},
 };
 
