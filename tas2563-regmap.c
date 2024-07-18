@@ -367,6 +367,10 @@ static void irq_work_routine(struct work_struct *work)
 	if (((nDevInt1Status & 0x7) != 0) || ((nDevInt2Status & 0x0f) != 0)) {
 		/* in case of INT_OC, INT_OT, INT_OVLT, INT_UVLT, INT_BO */
 
+		if (nDevInt1Status & TAS2563_LatchedInterruptReg0_TDMClockErrorSticky_Interrupt) {
+			dev_err(pTAS2563->dev, "*** Clock Error!\n");
+		}
+
 		if (nDevInt1Status & TAS2563_LatchedInterruptReg0_OCEFlagSticky_Interrupt) {
 			pTAS2563->mnErrCode |= ERROR_OVER_CURRENT;
 			dev_err(pTAS2563->dev, "SPK over current!\n");
